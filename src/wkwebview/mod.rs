@@ -639,6 +639,7 @@ impl InnerWebView {
         webview.clone(),
         pending_scripts.clone(),
         has_download_handler,
+        pl_attrs.allow_app_links,
         attributes.navigation_handler,
         download_delegate.clone(),
         attributes.on_page_load_handler,

@@ -1583,6 +1583,7 @@ pub(crate) struct PlatformSpecificWebViewAttributes {
   data_store_identifier: Option<[u8; 16]>,
   traffic_light_inset: Option<dpi::Position>,
   allow_link_preview: bool,
+  allow_app_links: bool,
   on_web_content_process_terminate_handler: Option<Box<dyn Fn()>>,
   #[cfg(target_os = "ios")]
   input_accessory_view_builder: Option<Box<InputAccessoryViewBuilder>>,
@@ -1600,6 +1601,7 @@ impl Default for PlatformSpecificWebViewAttributes {
       traffic_light_inset: None,
       // platform default for this is true
       allow_link_preview: true,
+      allow_app_links: true,
       on_web_content_process_terminate_handler: None,
       #[cfg(target_os = "ios")]
       input_accessory_view_builder: None,
@@ -1632,6 +1634,17 @@ pub trait WebViewBuilderExtDarwin {
   ///
   /// See https://developer.apple.com/documentation/webkit/wkwebview/allowslinkpreview
   fn with_allow_link_preview(self, allow_link_preview: bool) -> Self;
+  /// Whether WebKit may hand a navigation to another application that claims its URL, such as
+  /// a native app or an installed web app registered for the site (app links and universal
+  /// links), instead of loading it in the webview. Available on macOS and iOS only.
+  ///
+  /// Default is true. When false, WebKit does not offer navigations that the navigation handler
+  /// allows to other applications through app links. (WebKit may still intercept some
+  /// navigations for other reasons, such as single sign-on extensions.) This uses WebKit's
+  /// `_WKNavigationActionPolicyAllowWithoutTryingAppLink`, a private value of
+  /// `WKNavigationActionPolicy`. Like the navigation handler, it does not apply
+  /// to windows that WebKit opens itself for [`NewWindowResponse::Allow`].
+  fn with_allow_app_links(self, allow_app_links: bool) -> Self;
   /// Set a handler closure to respond to web content process termination. Available on macOS and iOS only.
   fn with_on_web_content_process_terminate_handler(self, handler: impl Fn() + 'static) -> Self;
 }
@@ -1650,6 +1663,11 @@ impl WebViewBuilderExtDarwin for WebViewBuilder<'_> {
 
   fn with_allow_link_preview(mut self, allow_link_preview: bool) -> Self {
     self.platform_specific.allow_link_preview = allow_link_preview;
+    self
+  }
+
+  fn with_allow_app_links(mut self, allow_app_links: bool) -> Self {
+    self.platform_specific.allow_app_links = allow_app_links;
     self
   }
 

@@ -60,6 +60,12 @@ pub(crate) fn did_finish_navigation(
   }
 }
 
+/// `_WKNavigationActionPolicyAllowWithoutTryingAppLink` from WebKit's private
+/// `WKNavigationDelegatePrivate.h`: allow the navigation, but load it in this webview even when
+/// another application claims the URL.
+const ALLOW_WITHOUT_TRYING_APP_LINK: WKNavigationActionPolicy =
+  WKNavigationActionPolicy(WKNavigationActionPolicy::Allow.0 + 2);
+
 // Navigation handler
 pub(crate) fn navigation_policy(
   this: &WryNavigationDelegate,
@@ -93,8 +99,13 @@ pub(crate) fn navigation_policy(
       }
     } else {
       let function = &this.ivars().navigation_policy_function;
+      let allow = if this.ivars().allow_app_links {
+        WKNavigationActionPolicy::Allow
+      } else {
+        ALLOW_WITHOUT_TRYING_APP_LINK
+      };
       match function(url.to_string()) {
-        true => (*handler).call((WKNavigationActionPolicy::Allow,)),
+        true => (*handler).call((allow,)),
         false => (*handler).call((WKNavigationActionPolicy::Cancel,)),
       };
     }
