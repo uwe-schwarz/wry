@@ -1,5 +1,5 @@
 use objc2::DeclaredClass;
-use objc2_foundation::{NSObjectProtocol, NSString};
+use objc2_foundation::{NSHTTPURLResponse, NSObjectProtocol, NSString};
 use objc2_web_kit::{
   WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationResponse,
   WKNavigationResponsePolicy,
@@ -110,17 +110,41 @@ pub(crate) fn navigation_policy_response(
 ) {
   unsafe {
     let can_show_mime_type = response.canShowMIMEType();
+    let has_download_handler = this.ivars().has_download_handler;
 
-    if !can_show_mime_type {
-      let has_download_handler = this.ivars().has_download_handler;
-      if has_download_handler {
-        (*handler).call((WKNavigationResponsePolicy::Download,));
-        return;
-      }
+    if has_download_handler && (!can_show_mime_type || is_attachment(response)) {
+      (*handler).call((WKNavigationResponsePolicy::Download,));
+      return;
     }
 
     (*handler).call((WKNavigationResponsePolicy::Allow,));
   }
+}
+
+/// Whether the response asks to be saved rather than shown (`Content-Disposition: attachment`).
+/// Browsers download such responses even when they could display them, such as a PDF or a text
+/// file. This is the rule of WebKit's own `ResourceResponse::isAttachment`.
+///
+/// Only with `WKDownload` (macOS 11.3+, iOS 14.5+): before it, a download that WebKit could
+/// have displayed would not reach the download handler.
+fn is_attachment(response: &WKNavigationResponse) -> bool {
+  if objc2::runtime::AnyClass::get(c"WKDownload").is_none() {
+    return false;
+  }
+  let response = unsafe { response.response() };
+  let Some(response) = response.downcast_ref::<NSHTTPURLResponse>() else {
+    return false;
+  };
+  let header = response.valueForHTTPHeaderField(&NSString::from_str("Content-Disposition"));
+  header.is_some_and(|value| {
+    let value = value.to_string();
+    let disposition = value
+      .split(';')
+      .next()
+      .unwrap_or_default()
+      .trim_matches(|c: char| c.is_ascii_whitespace());
+    disposition.eq_ignore_ascii_case("attachment")
+  })
 }
 
 pub(crate) fn web_content_process_did_terminate(
